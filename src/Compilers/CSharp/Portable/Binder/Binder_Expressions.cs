@@ -792,6 +792,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case SyntaxKind.WithExpression:
                     return BindWithExpression((WithExpressionSyntax)node, diagnostics);
 
+                case SyntaxKind.InExpression:
+                    return BindInExpression((BinaryExpressionSyntax)node, diagnostics);
+
                 default:
                     // NOTE: We could probably throw an exception here, but it's conceivable
                     // that a non-parser syntax tree could reach this point with an unexpected
@@ -800,6 +803,61 @@ namespace Microsoft.CodeAnalysis.CSharp
                     diagnostics.Add(ErrorCode.ERR_InternalError, node.Location);
                     return BadExpression(node);
             }
+        }
+
+        private BoundExpression BindInExpression(BinaryExpressionSyntax node, BindingDiagnosticBag diagnostics)
+        {
+            var element = BindRValueWithoutTargetType(node.Left, diagnostics);// L vs R values//var element = BindExpression(node.Left, diagnostics);
+            var source = BindRValueWithoutTargetType(node.Right, diagnostics);
+
+            if (source is BoundRangeExpression range)
+            {
+                void CheckOperand(BoundExpression operand)
+                {
+                    if (operand != null)
+                    {
+                        if (operand is not BoundConversion { Operand: var value })
+                        {
+                            throw new NotImplementedException();
+                        }
+                        else
+                        {
+                            //var int32Type = GetSpecialType(SpecialType.System_Int32, diagnostics, node);
+                            //Debug.Assert(value.Type.Equals(int32Type));
+                        }
+                    }
+                }
+
+                CheckOperand(range.LeftOperandOpt);
+                CheckOperand(range.RightOperandOpt);
+            }
+            else if (source.Type.IsStringType())
+            {
+                var charType = GetSpecialType(SpecialType.System_Char, diagnostics, node);
+                if (!element.Type.Equals(charType, TypeCompareKind.ConsiderEverything2))
+                {
+                    throw new NotImplementedException();
+                }
+
+                // TODO: build source.IndexOf(elemnt) >= 0
+            }
+            else if (source.Type is ArrayTypeSymbol { IsSZArray: true, ElementType: var elementType } arrayType)
+            {
+                if (!elementType.Equals(element.Type, TypeCompareKind.ConsiderEverything2))
+                {
+                    throw new NotImplementedException();
+                }
+
+                // TODO: build System.Array.Index(source, element) >= 0
+            }
+            else
+            {
+                // TODO: build source.Contains(element)
+            }
+
+            var booleanType = GetSpecialType(SpecialType.System_Boolean, diagnostics, node);
+
+            return new BoundInOperator(node, element, source, booleanType);
         }
 
 #nullable enable

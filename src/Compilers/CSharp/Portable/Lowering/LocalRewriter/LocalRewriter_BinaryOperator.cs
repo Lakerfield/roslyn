@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -2390,6 +2391,43 @@ namespace Microsoft.CodeAnalysis.CSharp
                         loweredRight),
                     sizeOfExpression),
                 Conversion.PointerToInteger);
+        }
+
+        public override BoundNode? VisitInOperator(BoundInOperator node)
+        {
+            // x i (foo().?bar() ?? 42)..(72)
+
+            if (node.Source is 
+                BoundRangeExpression 
+                { 
+                    LeftOperandOpt: BoundConversion { Operand: var left }, 
+                    RightOperandOpt: BoundConversion { Operand: var right }
+                })
+            {
+                var element = VisitExpression(node.Element);
+                var left2 = VisitExpression(left);
+                var right2 = VisitExpression(right);
+
+                var elementLocal = _factory.StoreToTemp(element, out var storeElement);
+                var leftLocal = _factory.StoreToTemp(left2, out var storeLeft);
+                var rightLocal = _factory.StoreToTemp(right2, out var storeRight);
+
+                BoundExpression a = _factory.IntLessThanOrEqual(leftLocal, elementLocal); // left <= element
+                BoundExpression b = _factory.IntLessThan(elementLocal, rightLocal); // element < right
+
+                return 
+                    _factory.Sequence(
+                        ImmutableArray.Create(elementLocal.LocalSymbol, leftLocal.LocalSymbol, rightLocal.LocalSymbol),
+                        ImmutableArray.Create<BoundExpression>(storeElement, storeLeft, storeRight),
+                        _factory.LogicalAnd(a, b)
+                        );
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+
+            return base.VisitInOperator(node);
         }
     }
 }
