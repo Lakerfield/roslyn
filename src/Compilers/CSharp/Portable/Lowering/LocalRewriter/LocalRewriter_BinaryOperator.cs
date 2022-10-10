@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Xml.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.PooledObjects;
 using Roslyn.Utilities;
@@ -2424,10 +2425,43 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
             else
             {
-                throw new NotImplementedException();
+                Debug.Assert(node.ElementPlaceholder != null);
+                Debug.Assert(node.SourcePlaceholder != null);
+                Debug.Assert(node.Test != null);
+
+                var element = VisitExpression(node.Element);
+                var source = VisitExpression(node.Source);
+
+                var elementLocal = _factory.StoreToTemp(element, out var storeElement);
+                var sourceLocal = _factory.StoreToTemp(source, out var storeSource);
+
+                AddPlaceholderReplacement(node.ElementPlaceholder, elementLocal);
+                AddPlaceholderReplacement(node.SourcePlaceholder, sourceLocal);
+
+                var test = VisitExpression(node.Test);
+
+                RemovePlaceholderReplacement(node.SourcePlaceholder);
+                RemovePlaceholderReplacement(node.ElementPlaceholder);
+
+                return
+                    _factory.Sequence(
+                        ImmutableArray.Create(elementLocal.LocalSymbol, sourceLocal.LocalSymbol),
+                        ImmutableArray.Create<BoundExpression>(storeElement, storeSource),
+                        test
+                        );
             }
 
             return base.VisitInOperator(node);
+        }
+
+        public override BoundNode? VisitInOperatorElementPlaceholder(BoundInOperatorElementPlaceholder node)
+        {
+            return PlaceholderReplacement(node);
+        }
+
+        public override BoundNode? VisitInOperatorSourcePlaceholder(BoundInOperatorSourcePlaceholder node)
+        {
+            return PlaceholderReplacement(node);
         }
     }
 }

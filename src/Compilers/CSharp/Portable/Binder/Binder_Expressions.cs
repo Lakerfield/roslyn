@@ -807,6 +807,8 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private BoundExpression BindInExpression(BinaryExpressionSyntax node, BindingDiagnosticBag diagnostics)
         {
+            var booleanType = GetSpecialType(SpecialType.System_Boolean, diagnostics, node);
+
             var element = BindRValueWithoutTargetType(node.Left, diagnostics);// L vs R values//var element = BindExpression(node.Left, diagnostics);
             var source = BindRValueWithoutTargetType(node.Right, diagnostics);
 
@@ -830,6 +832,8 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 CheckOperand(range.LeftOperandOpt);
                 CheckOperand(range.RightOperandOpt);
+
+                return new BoundInOperator(node, element, source, null, null, null, booleanType);
             }
             else if (source.Type.IsStringType())
             {
@@ -839,7 +843,37 @@ namespace Microsoft.CodeAnalysis.CSharp
                     throw new NotImplementedException();
                 }
 
+                var elementPlaceholder = new BoundInOperatorElementPlaceholder(node, element.Type);
+                var sourcePlaceholder = new BoundInOperatorSourcePlaceholder(node, source.Type);
+                sourcePlaceholder.UseAsThis();//argubaly in special cases
+
+                var indexOf = MakeInvocationExpression(
+                    node, 
+                    sourcePlaceholder, 
+                    "IndexOf", 
+                    ImmutableArray.Create<BoundExpression>(elementPlaceholder), 
+                    diagnostics);
+
+                var int32Type = GetSpecialType(SpecialType.System_Int32, diagnostics, node);
+
+                var test = new BoundBinaryOperator(
+                    node,
+                    BinaryOperatorKind.GreaterThanOrEqual,
+                    null,
+                    LookupResultKind.Viable,
+                    indexOf,
+                    new BoundLiteral(node, ConstantValue.Create(0), int32Type),
+                    booleanType);
+
                 // TODO: build source.IndexOf(elemnt) >= 0
+                return new BoundInOperator(
+                    node, 
+                    element, 
+                    source, 
+                    elementPlaceholder, 
+                    sourcePlaceholder, 
+                    test, 
+                    booleanType);
             }
             else if (source.Type is ArrayTypeSymbol { IsSZArray: true, ElementType: var elementType } arrayType)
             {
@@ -849,15 +883,16 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
 
                 // TODO: build System.Array.Index(source, element) >= 0
+                throw new NotImplementedException();
+
             }
             else
             {
                 // TODO: build source.Contains(element)
+                throw new NotImplementedException();
             }
 
-            var booleanType = GetSpecialType(SpecialType.System_Boolean, diagnostics, node);
 
-            return new BoundInOperator(node, element, source, booleanType);
         }
 
 #nullable enable

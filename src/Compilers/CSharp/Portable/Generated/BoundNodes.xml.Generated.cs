@@ -83,6 +83,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         DefaultLiteral,
         DefaultExpression,
         IsOperator,
+        InOperatorElementPlaceholder,
+        InOperatorSourcePlaceholder,
         InOperator,
         AsOperator,
         SizeOfOperator,
@@ -2586,10 +2588,80 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
     }
 
+    internal sealed partial class BoundInOperatorElementPlaceholder : BoundValuePlaceholderBase
+    {
+        public BoundInOperatorElementPlaceholder(SyntaxNode syntax, TypeSymbol type, bool hasErrors)
+            : base(BoundKind.InOperatorElementPlaceholder, syntax, type, hasErrors)
+        {
+
+            RoslynDebug.Assert(type is object, "Field 'type' cannot be null (make the type nullable in BoundNodes.xml to remove this check)");
+
+        }
+
+        public BoundInOperatorElementPlaceholder(SyntaxNode syntax, TypeSymbol type)
+            : base(BoundKind.InOperatorElementPlaceholder, syntax, type)
+        {
+
+            RoslynDebug.Assert(type is object, "Field 'type' cannot be null (make the type nullable in BoundNodes.xml to remove this check)");
+
+        }
+
+        public new TypeSymbol Type => base.Type!;
+
+        [DebuggerStepThrough]
+        public override BoundNode? Accept(BoundTreeVisitor visitor) => visitor.VisitInOperatorElementPlaceholder(this);
+
+        public BoundInOperatorElementPlaceholder Update(TypeSymbol type)
+        {
+            if (!TypeSymbol.Equals(type, this.Type, TypeCompareKind.ConsiderEverything))
+            {
+                var result = new BoundInOperatorElementPlaceholder(this.Syntax, type, this.HasErrors);
+                result.CopyAttributes(this);
+                return result;
+            }
+            return this;
+        }
+    }
+
+    internal sealed partial class BoundInOperatorSourcePlaceholder : BoundValuePlaceholderBase
+    {
+        public BoundInOperatorSourcePlaceholder(SyntaxNode syntax, TypeSymbol type, bool hasErrors)
+            : base(BoundKind.InOperatorSourcePlaceholder, syntax, type, hasErrors)
+        {
+
+            RoslynDebug.Assert(type is object, "Field 'type' cannot be null (make the type nullable in BoundNodes.xml to remove this check)");
+
+        }
+
+        public BoundInOperatorSourcePlaceholder(SyntaxNode syntax, TypeSymbol type)
+            : base(BoundKind.InOperatorSourcePlaceholder, syntax, type)
+        {
+
+            RoslynDebug.Assert(type is object, "Field 'type' cannot be null (make the type nullable in BoundNodes.xml to remove this check)");
+
+        }
+
+        public new TypeSymbol Type => base.Type!;
+
+        [DebuggerStepThrough]
+        public override BoundNode? Accept(BoundTreeVisitor visitor) => visitor.VisitInOperatorSourcePlaceholder(this);
+
+        public BoundInOperatorSourcePlaceholder Update(TypeSymbol type)
+        {
+            if (!TypeSymbol.Equals(type, this.Type, TypeCompareKind.ConsiderEverything))
+            {
+                var result = new BoundInOperatorSourcePlaceholder(this.Syntax, type, this.HasErrors);
+                result.CopyAttributes(this);
+                return result;
+            }
+            return this;
+        }
+    }
+
     internal sealed partial class BoundInOperator : BoundExpression
     {
-        public BoundInOperator(SyntaxNode syntax, BoundExpression element, BoundExpression source, TypeSymbol type, bool hasErrors = false)
-            : base(BoundKind.InOperator, syntax, type, hasErrors || element.HasErrors() || source.HasErrors())
+        public BoundInOperator(SyntaxNode syntax, BoundExpression element, BoundExpression source, BoundInOperatorElementPlaceholder? elementPlaceholder, BoundInOperatorSourcePlaceholder? sourcePlaceholder, BoundExpression? test, TypeSymbol type, bool hasErrors = false)
+            : base(BoundKind.InOperator, syntax, type, hasErrors || element.HasErrors() || source.HasErrors() || elementPlaceholder.HasErrors() || sourcePlaceholder.HasErrors() || test.HasErrors())
         {
 
             RoslynDebug.Assert(element is object, "Field 'element' cannot be null (make the type nullable in BoundNodes.xml to remove this check)");
@@ -2598,20 +2670,26 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             this.Element = element;
             this.Source = source;
+            this.ElementPlaceholder = elementPlaceholder;
+            this.SourcePlaceholder = sourcePlaceholder;
+            this.Test = test;
         }
 
         public new TypeSymbol Type => base.Type!;
         public BoundExpression Element { get; }
         public BoundExpression Source { get; }
+        public BoundInOperatorElementPlaceholder? ElementPlaceholder { get; }
+        public BoundInOperatorSourcePlaceholder? SourcePlaceholder { get; }
+        public BoundExpression? Test { get; }
 
         [DebuggerStepThrough]
         public override BoundNode? Accept(BoundTreeVisitor visitor) => visitor.VisitInOperator(this);
 
-        public BoundInOperator Update(BoundExpression element, BoundExpression source, TypeSymbol type)
+        public BoundInOperator Update(BoundExpression element, BoundExpression source, BoundInOperatorElementPlaceholder? elementPlaceholder, BoundInOperatorSourcePlaceholder? sourcePlaceholder, BoundExpression? test, TypeSymbol type)
         {
-            if (element != this.Element || source != this.Source || !TypeSymbol.Equals(type, this.Type, TypeCompareKind.ConsiderEverything))
+            if (element != this.Element || source != this.Source || elementPlaceholder != this.ElementPlaceholder || sourcePlaceholder != this.SourcePlaceholder || test != this.Test || !TypeSymbol.Equals(type, this.Type, TypeCompareKind.ConsiderEverything))
             {
-                var result = new BoundInOperator(this.Syntax, element, source, type, this.HasErrors);
+                var result = new BoundInOperator(this.Syntax, element, source, elementPlaceholder, sourcePlaceholder, test, type, this.HasErrors);
                 result.CopyAttributes(this);
                 return result;
             }
@@ -8470,6 +8548,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                     return VisitDefaultExpression((BoundDefaultExpression)node, arg);
                 case BoundKind.IsOperator:
                     return VisitIsOperator((BoundIsOperator)node, arg);
+                case BoundKind.InOperatorElementPlaceholder:
+                    return VisitInOperatorElementPlaceholder((BoundInOperatorElementPlaceholder)node, arg);
+                case BoundKind.InOperatorSourcePlaceholder:
+                    return VisitInOperatorSourcePlaceholder((BoundInOperatorSourcePlaceholder)node, arg);
                 case BoundKind.InOperator:
                     return VisitInOperator((BoundInOperator)node, arg);
                 case BoundKind.AsOperator:
@@ -8855,6 +8937,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         public virtual R VisitDefaultLiteral(BoundDefaultLiteral node, A arg) => this.DefaultVisit(node, arg);
         public virtual R VisitDefaultExpression(BoundDefaultExpression node, A arg) => this.DefaultVisit(node, arg);
         public virtual R VisitIsOperator(BoundIsOperator node, A arg) => this.DefaultVisit(node, arg);
+        public virtual R VisitInOperatorElementPlaceholder(BoundInOperatorElementPlaceholder node, A arg) => this.DefaultVisit(node, arg);
+        public virtual R VisitInOperatorSourcePlaceholder(BoundInOperatorSourcePlaceholder node, A arg) => this.DefaultVisit(node, arg);
         public virtual R VisitInOperator(BoundInOperator node, A arg) => this.DefaultVisit(node, arg);
         public virtual R VisitAsOperator(BoundAsOperator node, A arg) => this.DefaultVisit(node, arg);
         public virtual R VisitSizeOfOperator(BoundSizeOfOperator node, A arg) => this.DefaultVisit(node, arg);
@@ -9079,6 +9163,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         public virtual BoundNode? VisitDefaultLiteral(BoundDefaultLiteral node) => this.DefaultVisit(node);
         public virtual BoundNode? VisitDefaultExpression(BoundDefaultExpression node) => this.DefaultVisit(node);
         public virtual BoundNode? VisitIsOperator(BoundIsOperator node) => this.DefaultVisit(node);
+        public virtual BoundNode? VisitInOperatorElementPlaceholder(BoundInOperatorElementPlaceholder node) => this.DefaultVisit(node);
+        public virtual BoundNode? VisitInOperatorSourcePlaceholder(BoundInOperatorSourcePlaceholder node) => this.DefaultVisit(node);
         public virtual BoundNode? VisitInOperator(BoundInOperator node) => this.DefaultVisit(node);
         public virtual BoundNode? VisitAsOperator(BoundAsOperator node) => this.DefaultVisit(node);
         public virtual BoundNode? VisitSizeOfOperator(BoundSizeOfOperator node) => this.DefaultVisit(node);
@@ -9471,6 +9557,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             this.Visit(node.TargetType);
             return null;
         }
+        public override BoundNode? VisitInOperatorElementPlaceholder(BoundInOperatorElementPlaceholder node) => null;
+        public override BoundNode? VisitInOperatorSourcePlaceholder(BoundInOperatorSourcePlaceholder node) => null;
         public override BoundNode? VisitInOperator(BoundInOperator node)
         {
             this.Visit(node.Element);
@@ -10606,12 +10694,25 @@ namespace Microsoft.CodeAnalysis.CSharp
             TypeSymbol? type = this.VisitType(node.Type);
             return node.Update(operand, targetType, node.ConversionKind, type);
         }
+        public override BoundNode? VisitInOperatorElementPlaceholder(BoundInOperatorElementPlaceholder node)
+        {
+            TypeSymbol? type = this.VisitType(node.Type);
+            return node.Update(type);
+        }
+        public override BoundNode? VisitInOperatorSourcePlaceholder(BoundInOperatorSourcePlaceholder node)
+        {
+            TypeSymbol? type = this.VisitType(node.Type);
+            return node.Update(type);
+        }
         public override BoundNode? VisitInOperator(BoundInOperator node)
         {
             BoundExpression element = (BoundExpression)this.Visit(node.Element);
             BoundExpression source = (BoundExpression)this.Visit(node.Source);
+            BoundInOperatorElementPlaceholder? elementPlaceholder = node.ElementPlaceholder;
+            BoundInOperatorSourcePlaceholder? sourcePlaceholder = node.SourcePlaceholder;
+            BoundExpression? test = node.Test;
             TypeSymbol? type = this.VisitType(node.Type);
-            return node.Update(element, source, type);
+            return node.Update(element, source, elementPlaceholder, sourcePlaceholder, test, type);
         }
         public override BoundNode? VisitAsOperator(BoundAsOperator node)
         {
@@ -12467,20 +12568,47 @@ namespace Microsoft.CodeAnalysis.CSharp
             return updatedNode;
         }
 
+        public override BoundNode? VisitInOperatorElementPlaceholder(BoundInOperatorElementPlaceholder node)
+        {
+            if (!_updatedNullabilities.TryGetValue(node, out (NullabilityInfo Info, TypeSymbol? Type) infoAndType))
+            {
+                return node;
+            }
+
+            BoundInOperatorElementPlaceholder updatedNode = node.Update(infoAndType.Type!);
+            updatedNode.TopLevelNullability = infoAndType.Info;
+            return updatedNode;
+        }
+
+        public override BoundNode? VisitInOperatorSourcePlaceholder(BoundInOperatorSourcePlaceholder node)
+        {
+            if (!_updatedNullabilities.TryGetValue(node, out (NullabilityInfo Info, TypeSymbol? Type) infoAndType))
+            {
+                return node;
+            }
+
+            BoundInOperatorSourcePlaceholder updatedNode = node.Update(infoAndType.Type!);
+            updatedNode.TopLevelNullability = infoAndType.Info;
+            return updatedNode;
+        }
+
         public override BoundNode? VisitInOperator(BoundInOperator node)
         {
             BoundExpression element = (BoundExpression)this.Visit(node.Element);
             BoundExpression source = (BoundExpression)this.Visit(node.Source);
+            BoundInOperatorElementPlaceholder? elementPlaceholder = node.ElementPlaceholder;
+            BoundInOperatorSourcePlaceholder? sourcePlaceholder = node.SourcePlaceholder;
+            BoundExpression? test = node.Test;
             BoundInOperator updatedNode;
 
             if (_updatedNullabilities.TryGetValue(node, out (NullabilityInfo Info, TypeSymbol? Type) infoAndType))
             {
-                updatedNode = node.Update(element, source, infoAndType.Type!);
+                updatedNode = node.Update(element, source, elementPlaceholder, sourcePlaceholder, test, infoAndType.Type!);
                 updatedNode.TopLevelNullability = infoAndType.Info;
             }
             else
             {
-                updatedNode = node.Update(element, source, node.Type);
+                updatedNode = node.Update(element, source, elementPlaceholder, sourcePlaceholder, test, node.Type);
             }
             return updatedNode;
         }
@@ -14722,10 +14850,27 @@ namespace Microsoft.CodeAnalysis.CSharp
             new TreeDumperNode("hasErrors", node.HasErrors, null)
         }
         );
+        public override TreeDumperNode VisitInOperatorElementPlaceholder(BoundInOperatorElementPlaceholder node, object? arg) => new TreeDumperNode("inOperatorElementPlaceholder", null, new TreeDumperNode[]
+        {
+            new TreeDumperNode("type", node.Type, null),
+            new TreeDumperNode("isSuppressed", node.IsSuppressed, null),
+            new TreeDumperNode("hasErrors", node.HasErrors, null)
+        }
+        );
+        public override TreeDumperNode VisitInOperatorSourcePlaceholder(BoundInOperatorSourcePlaceholder node, object? arg) => new TreeDumperNode("inOperatorSourcePlaceholder", null, new TreeDumperNode[]
+        {
+            new TreeDumperNode("type", node.Type, null),
+            new TreeDumperNode("isSuppressed", node.IsSuppressed, null),
+            new TreeDumperNode("hasErrors", node.HasErrors, null)
+        }
+        );
         public override TreeDumperNode VisitInOperator(BoundInOperator node, object? arg) => new TreeDumperNode("inOperator", null, new TreeDumperNode[]
         {
             new TreeDumperNode("element", null, new TreeDumperNode[] { Visit(node.Element, null) }),
             new TreeDumperNode("source", null, new TreeDumperNode[] { Visit(node.Source, null) }),
+            new TreeDumperNode("elementPlaceholder", null, new TreeDumperNode[] { Visit(node.ElementPlaceholder, null) }),
+            new TreeDumperNode("sourcePlaceholder", null, new TreeDumperNode[] { Visit(node.SourcePlaceholder, null) }),
+            new TreeDumperNode("test", null, new TreeDumperNode[] { Visit(node.Test, null) }),
             new TreeDumperNode("type", node.Type, null),
             new TreeDumperNode("isSuppressed", node.IsSuppressed, null),
             new TreeDumperNode("hasErrors", node.HasErrors, null)
