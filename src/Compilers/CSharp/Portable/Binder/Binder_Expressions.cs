@@ -882,13 +882,65 @@ namespace Microsoft.CodeAnalysis.CSharp
                     throw new NotImplementedException();
                 }
 
-                // TODO: build System.Array.Index(source, element) >= 0
-                throw new NotImplementedException();
+                var elementPlaceholder = new BoundInOperatorElementPlaceholder(node, element.Type);
+                var sourcePlaceholder = new BoundInOperatorSourcePlaceholder(node, source.Type);
+                sourcePlaceholder.UseAsThis();//argubaly in special cases
 
+                var arrayType2 = GetSpecialType(SpecialType.System_Array, diagnostics, node);
+
+                var indexOf = MakeInvocationExpression(
+                    node,
+                    new BoundTypeExpression(node, null, arrayType2),
+                    "IndexOf",
+                    ImmutableArray.Create<BoundExpression>(sourcePlaceholder, elementPlaceholder),
+                    diagnostics);
+
+
+                var int32Type = GetSpecialType(SpecialType.System_Int32, diagnostics, node);
+
+                var test = new BoundBinaryOperator(
+                    node,
+                    BinaryOperatorKind.GreaterThanOrEqual,
+                    null,
+                    LookupResultKind.Viable,
+                    indexOf,
+                    new BoundLiteral(node, ConstantValue.Create(0), int32Type),
+                    //new BoundLiteral(node, ConstantValue.Create(true), booleanType),
+                    booleanType);
+
+                // TODO: build System.Array.Index(source, element) >= 0
+                return new BoundInOperator(
+                    node,
+                    element,
+                    source,
+                    elementPlaceholder,
+                    sourcePlaceholder,
+                    test,
+                    booleanType);
             }
             else
             {
+                var elementPlaceholder = new BoundInOperatorElementPlaceholder(node, element.Type);
+                var sourcePlaceholder = new BoundInOperatorSourcePlaceholder(node, source.Type);
+                sourcePlaceholder.UseAsThis();//argubaly in special cases
+
+                var contains = MakeInvocationExpression(
+                    node,
+                    sourcePlaceholder,
+                    "Contains",
+                    ImmutableArray.Create<BoundExpression>(elementPlaceholder),
+                    diagnostics);
+
                 // TODO: build source.Contains(element)
+                return new BoundInOperator(
+                    node,
+                    element,
+                    source,
+                    elementPlaceholder,
+                    sourcePlaceholder,
+                    contains,
+                    booleanType);
+
                 throw new NotImplementedException();
             }
 
