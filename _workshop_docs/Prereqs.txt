@@ -1,0 +1,30 @@
+Prereqs:
+
+ 
+
+Installation of Visual Studio 2022 with .NET workload enabled.
+Visual Studio 2022 IDE - Programming Tool for Software Developers (microsoft.com)
+
+Installation of Git.
+Git - Downloads (git-scm.com)
+
+GitHub account.
+GitHub
+
+Fork Roslyn repo.
+Fork dotnet/roslyn (github.com)
+
+Git clone and build forked repo.
+mkdir %USERPROFILE%\source\repos
+cd %USERPROFILE%\source\repos
+git clone https://github.com/xyz/roslyn.git (replace <xyz> with your GitHub user name)
+cd roslyn
+restore.cmd
+build.cmd
+
+Install .NET 7 RC1 SDK
+Download .NET 7.0 (Linux, macOS, and Windows) (microsoft.com)
+
+Install ILSpy
+ILSpy - Microsoft Store Apps
+https://apps.microsoft.com/store/detail/ilspy/9MXFBKFVSQ13?hl=en-us&gl=us
